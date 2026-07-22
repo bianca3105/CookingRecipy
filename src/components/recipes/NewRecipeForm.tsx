@@ -2,9 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import clsx from "clsx";
 import { ListEditor } from "@/components/ui/ListEditor";
 
 type Folder = { id: string; key: string; name: string };
+type Mode = "link" | "text";
+
+const FAILED_BANNER = "No pudimos abrir ese link. Puedes intentar con otro o escribir la receta a mano.";
+const PARTIAL_BANNER = "Encontramos parte de la receta. Revisa y completa lo que falte antes de guardar.";
+const NOT_A_RECIPE_BANNER = "No pudimos organizar eso como receta. Puedes completarla a mano.";
 
 export function NewRecipeForm({
   folders,
@@ -15,7 +21,9 @@ export function NewRecipeForm({
 }) {
   const router = useRouter();
 
+  const [mode, setMode] = useState<Mode>("link");
   const [url, setUrl] = useState("");
+  const [pastedText, setPastedText] = useState("");
   const [extracting, setExtracting] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
@@ -32,6 +40,41 @@ export function NewRecipeForm({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  function applyResult(
+    result: {
+      status: "ok" | "partial" | "failed";
+      data?: {
+        name: string | null;
+        imageUrl: string | null;
+        servings: string | null;
+        totalTime: string | null;
+        sourceUrl: string | null;
+        ingredients: string[];
+        steps: string[];
+      } | null;
+    },
+    fallbackSourceUrl: string,
+    failedBanner: string
+  ) {
+    if (result.status === "failed") {
+      setBanner(failedBanner);
+    } else if (result.status === "partial") {
+      setBanner(PARTIAL_BANNER);
+    }
+
+    if (result.data) {
+      setName(result.data.name ?? "");
+      setImageUrl(result.data.imageUrl ?? "");
+      setServings(result.data.servings ?? "");
+      setTotalTime(result.data.totalTime ?? "");
+      setSourceUrl(result.data.sourceUrl ?? fallbackSourceUrl);
+      setIngredients(result.data.ingredients?.length ? result.data.ingredients : [""]);
+      setSteps(result.data.steps?.length ? result.data.steps : [""]);
+    } else {
+      setSourceUrl(fallbackSourceUrl);
+    }
+  }
+
   async function handleExtract() {
     const trimmed = url.trim();
     if (!trimmed) return;
@@ -44,26 +87,9 @@ export function NewRecipeForm({
         body: JSON.stringify({ url: trimmed }),
       });
       const result = await res.json();
-
-      if (result.status === "failed") {
-        setBanner("No pudimos abrir ese link. Puedes intentar con otro o escribir la receta a mano.");
-      } else if (result.status === "partial") {
-        setBanner("Encontramos parte de la receta. Revisa y completa lo que falte antes de guardar.");
-      }
-
-      if (result.data) {
-        setName(result.data.name ?? "");
-        setImageUrl(result.data.imageUrl ?? "");
-        setServings(result.data.servings ?? "");
-        setTotalTime(result.data.totalTime ?? "");
-        setSourceUrl(result.data.sourceUrl ?? trimmed);
-        setIngredients(result.data.ingredients?.length ? result.data.ingredients : [""]);
-        setSteps(result.data.steps?.length ? result.data.steps : [""]);
-      } else {
-        setSourceUrl(trimmed);
-      }
+      applyResult(result, trimmed, FAILED_BANNER);
     } catch {
-      setBanner("No pudimos abrir ese link. Puedes intentar con otro o escribir la receta a mano.");
+      setBanner(FAILED_BANNER);
       setSourceUrl(trimmed);
     } finally {
       setExtracting(false);
@@ -71,8 +97,29 @@ export function NewRecipeForm({
     }
   }
 
+  async function handleOrganize() {
+    const trimmed = pastedText.trim();
+    if (!trimmed) return;
+    setExtracting(true);
+    setBanner(null);
+    try {
+      const res = await fetch("/api/organize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: trimmed }),
+      });
+      const result = await res.json();
+      applyResult(result, "", NOT_A_RECIPE_BANNER);
+    } catch {
+      setBanner(NOT_A_RECIPE_BANNER);
+    } finally {
+      setExtracting(false);
+      setShowForm(true);
+    }
+  }
+
   function handleManualEntry() {
-    setSourceUrl(url.trim());
+    setSourceUrl(mode === "link" ? url.trim() : "");
     setShowForm(true);
   }
 
@@ -109,22 +156,71 @@ export function NewRecipeForm({
 
   if (!showForm) {
     return (
-      <div className="flex flex-col gap-3">
-        <input
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://..."
-          inputMode="url"
-          className="rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text"
-        />
-        <button
-          type="button"
-          onClick={handleExtract}
-          disabled={!url.trim() || extracting}
-          className="h-12 rounded-full bg-accent text-sm font-medium text-white disabled:opacity-50"
-        >
-          {extracting ? "Buscando receta…" : "Buscar receta"}
-        </button>
+      <div className="flex flex-col gap-4">
+        <div className="flex gap-2 rounded-full bg-surface p-1">
+          <button
+            type="button"
+            onClick={() => setMode("link")}
+            className={clsx(
+              "flex-1 rounded-full py-2 text-sm font-medium transition",
+              mode === "link" ? "bg-accent text-white" : "text-text-muted"
+            )}
+          >
+            Desde un link
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("text")}
+            className={clsx(
+              "flex-1 rounded-full py-2 text-sm font-medium transition",
+              mode === "text" ? "bg-accent text-white" : "text-text-muted"
+            )}
+          >
+            Pegar el texto
+          </button>
+        </div>
+
+        {mode === "link" ? (
+          <div className="flex flex-col gap-3">
+            <input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://..."
+              inputMode="url"
+              className="rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text"
+            />
+            <button
+              type="button"
+              onClick={handleExtract}
+              disabled={!url.trim() || extracting}
+              className="h-12 rounded-full bg-accent text-sm font-medium text-white disabled:opacity-50"
+            >
+              {extracting ? "Buscando receta…" : "Buscar receta"}
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <p className="text-xs text-text-muted">
+              Pega el texto de la receta (ej. el caption de un video, o una receta copiada de cualquier lado) y la organizamos en ingredientes y pasos.
+            </p>
+            <textarea
+              value={pastedText}
+              onChange={(e) => setPastedText(e.target.value)}
+              placeholder="Ej. Tortilla española: 4 huevos, 3 papas, 1 cebolla... pelar y cortar las papas, freír a fuego lento..."
+              rows={6}
+              className="rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text"
+            />
+            <button
+              type="button"
+              onClick={handleOrganize}
+              disabled={!pastedText.trim() || extracting}
+              className="h-12 rounded-full bg-accent text-sm font-medium text-white disabled:opacity-50"
+            >
+              {extracting ? "Organizando…" : "Organizar receta"}
+            </button>
+          </div>
+        )}
+
         <button
           type="button"
           onClick={handleManualEntry}
