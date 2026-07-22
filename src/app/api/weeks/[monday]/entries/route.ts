@@ -24,9 +24,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ mon
     create: { startDate },
   });
 
+  // Upsert on (week, day, meal, recipe): dropping the same recipe twice on the
+  // same slot is a no-op instead of a duplicate row. Different recipes in the
+  // same slot are separate rows — a meal can have several dishes.
   const entry = await prisma.menuEntry.upsert({
-    where: { weekId_dayIndex_mealType: { weekId: week.id, dayIndex, mealType } },
-    update: { recipeId },
+    where: { weekId_dayIndex_mealType_recipeId: { weekId: week.id, dayIndex, mealType, recipeId } },
+    update: {},
     create: { weekId: week.id, dayIndex, mealType, recipeId },
     include: { recipe: { select: { id: true, name: true, imageUrl: true } } },
   });

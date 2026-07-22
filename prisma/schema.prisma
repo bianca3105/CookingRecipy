@@ -48,6 +48,7 @@ model MenuEntry {
   recipeId String
   recipe   Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
 
-  @@unique([weekId, dayIndex, mealType])
+  @@unique([weekId, dayIndex, mealType, recipeId])
+  @@index([weekId, dayIndex, mealType])
   @@index([recipeId])
 }

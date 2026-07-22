@@ -15,18 +15,18 @@ export function slotKey(dayIndex: number, mealType: string): string {
 export function MenuSlot({
   dayIndex,
   mealType,
-  slot,
-  pending,
+  entries,
+  pendingEntryIds,
   onTap,
   onClear,
   variant,
 }: {
   dayIndex: number;
   mealType: MealType;
-  slot?: SlotValue;
-  pending: boolean;
+  entries: SlotValue[];
+  pendingEntryIds: Set<string>;
   onTap: () => void;
-  onClear: () => void;
+  onClear: (entryId: string) => void;
   variant: "row" | "grid";
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: slotKey(dayIndex, mealType) });
@@ -36,37 +36,41 @@ export function MenuSlot({
       <div
         ref={setNodeRef}
         className={clsx(
-          "flex min-h-[3.25rem] items-center gap-3 rounded-xl border px-3 py-2",
-          isOver ? "border-accent bg-surface-hover" : "border-border bg-surface",
-          pending && "opacity-60"
+          "flex min-h-[3.25rem] flex-col gap-1.5 rounded-xl border px-3 py-2",
+          isOver ? "border-accent bg-surface-hover" : "border-border bg-surface"
         )}
       >
-        <span className="w-16 shrink-0 text-xs font-medium text-text-muted">{MEAL_LABELS[mealType]}</span>
-        {slot ? (
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <Link href={`/recetas/receta/${slot.recipe.id}`} className="flex min-w-0 flex-1 items-center gap-2">
-              {slot.recipe.imageUrl ? (
+        <span className="text-xs font-medium text-text-muted">{MEAL_LABELS[mealType]}</span>
+        {entries.map((entry) => (
+          <div
+            key={entry.entryId}
+            className={clsx(
+              "flex min-w-0 items-center gap-2",
+              pendingEntryIds.has(entry.entryId) && "opacity-60"
+            )}
+          >
+            <Link href={`/recetas/receta/${entry.recipe.id}`} className="flex min-w-0 flex-1 items-center gap-2">
+              {entry.recipe.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={slot.recipe.imageUrl} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
+                <img src={entry.recipe.imageUrl} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
               ) : (
                 <div className="h-9 w-9 shrink-0 rounded-lg bg-surface-hover" />
               )}
-              <span className="truncate text-sm font-medium text-text">{slot.recipe.name}</span>
+              <span className="truncate text-sm font-medium text-text">{entry.recipe.name}</span>
             </Link>
             <button
               type="button"
-              onClick={onClear}
+              onClick={() => onClear(entry.entryId)}
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-text-muted"
               aria-label="Quitar"
             >
               ×
             </button>
           </div>
-        ) : (
-          <button type="button" onClick={onTap} className="flex-1 text-left text-xs text-text-muted">
-            Arrastra o toca una receta…
-          </button>
-        )}
+        ))}
+        <button type="button" onClick={onTap} className="text-left text-xs text-text-muted">
+          {entries.length === 0 ? "Arrastra o toca una receta…" : "+ Agregar otro plato"}
+        </button>
       </div>
     );
   }
@@ -75,37 +79,34 @@ export function MenuSlot({
     <div
       ref={setNodeRef}
       className={clsx(
-        "relative aspect-square overflow-hidden rounded-lg border",
-        isOver ? "border-accent bg-surface-hover" : "border-border bg-surface",
-        pending && "opacity-60"
+        "flex min-h-[4.5rem] flex-col gap-0.5 overflow-hidden rounded-lg border p-1",
+        isOver ? "border-accent bg-surface-hover" : "border-border bg-surface"
       )}
     >
-      {slot ? (
-        <>
-          <Link href={`/recetas/receta/${slot.recipe.id}`} className="absolute inset-0 flex items-end p-1">
-            {slot.recipe.imageUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={slot.recipe.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
-            )}
-            <span className="relative z-10 w-full truncate rounded bg-black/45 px-1 text-[10px] font-medium text-white">
-              {slot.recipe.name}
-            </span>
+      {entries.map((entry) => (
+        <div
+          key={entry.entryId}
+          className={clsx(
+            "flex items-center gap-1 rounded bg-bg/60",
+            pendingEntryIds.has(entry.entryId) && "opacity-60"
+          )}
+        >
+          <Link href={`/recetas/receta/${entry.recipe.id}`} className="min-w-0 flex-1 truncate px-1 py-0.5 text-[9px] font-medium text-text">
+            {entry.recipe.name}
           </Link>
           <button
             type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              onClear();
-            }}
-            className="absolute right-0.5 top-0.5 z-20 flex h-4 w-4 items-center justify-center rounded-full bg-black/50 text-[9px] text-white"
+            onClick={() => onClear(entry.entryId)}
+            className="shrink-0 px-1 text-[10px] text-text-muted"
             aria-label="Quitar"
           >
             ×
           </button>
-        </>
-      ) : (
-        <button type="button" onClick={onTap} className="h-full w-full" aria-label="Vacío" />
-      )}
+        </div>
+      ))}
+      <button type="button" onClick={onTap} className="px-1 text-left text-[9px] text-text-muted">
+        {entries.length === 0 ? "Vacío" : "+ agregar"}
+      </button>
     </div>
   );
 }

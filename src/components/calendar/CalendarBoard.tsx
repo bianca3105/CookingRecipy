@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   DndContext,
@@ -36,15 +36,19 @@ export function CalendarBoard({
   entries: Entry[];
   folders: Folder[];
 }) {
-  const [slots, setSlots] = useState<Record<string, SlotValue>>(() => {
-    const initial: Record<string, SlotValue> = {};
-    for (const e of entries) initial[slotKey(e.dayIndex, e.mealType)] = { entryId: e.id, recipe: e.recipe };
+  const [slots, setSlots] = useState<Record<string, SlotValue[]>>(() => {
+    const initial: Record<string, SlotValue[]> = {};
+    for (const e of entries) {
+      const key = slotKey(e.dayIndex, e.mealType);
+      (initial[key] ??= []).push({ entryId: e.id, recipe: e.recipe });
+    }
     return initial;
   });
-  const [pendingSlots, setPendingSlots] = useState<Set<string>>(new Set());
+  const [pendingEntryIds, setPendingEntryIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [armedRecipeId, setArmedRecipeId] = useState<string | null>(null);
   const [folderFilter, setFolderFilter] = useState<string>("all");
+  const tempIdCounter = useRef(0);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -59,9 +63,12 @@ export function CalendarBoard({
 
   async function assign(dayIndex: number, mealType: MealType, recipe: ChipRecipe) {
     const key = slotKey(dayIndex, mealType);
-    const prevSlot = slots[key];
-    setSlots((s) => ({ ...s, [key]: { entryId: prevSlot?.entryId ?? "pending", recipe } }));
-    setPendingSlots((p) => new Set(p).add(key));
+    const existing = slots[key] ?? [];
+    if (existing.some((e) => e.recipe.id === recipe.id)) return;
+
+    const tempId = `pending-${tempIdCounter.current++}`;
+    setSlots((s) => ({ ...s, [key]: [...(s[key] ?? []), { entryId: tempId, recipe }] }));
+    setPendingEntryIds((p) => new Set(p).add(tempId));
     setError(null);
 
     try {
@@ -72,40 +79,36 @@ export function CalendarBoard({
       });
       if (!res.ok) throw new Error("assign_failed");
       const entry = await res.json();
-      setSlots((s) => ({ ...s, [key]: { entryId: entry.id, recipe: entry.recipe } }));
+      setSlots((s) => ({
+        ...s,
+        [key]: (s[key] ?? []).map((e) => (e.entryId === tempId ? { entryId: entry.id, recipe: entry.recipe } : e)),
+      }));
     } catch {
-      setSlots((s) => {
-        const next = { ...s };
-        if (prevSlot) next[key] = prevSlot;
-        else delete next[key];
-        return next;
-      });
+      setSlots((s) => ({ ...s, [key]: (s[key] ?? []).filter((e) => e.entryId !== tempId) }));
       setError("No se pudo guardar. Intenta de nuevo.");
     } finally {
-      setPendingSlots((p) => {
+      setPendingEntryIds((p) => {
         const next = new Set(p);
-        next.delete(key);
+        next.delete(tempId);
         return next;
       });
     }
   }
 
-  async function clear(dayIndex: number, mealType: MealType) {
+  async function clear(entryId: string, dayIndex: number, mealType: MealType) {
     const key = slotKey(dayIndex, mealType);
-    const prevSlot = slots[key];
-    if (!prevSlot) return;
-    setSlots((s) => {
-      const next = { ...s };
-      delete next[key];
-      return next;
-    });
+    const prevEntries = slots[key] ?? [];
+    const target = prevEntries.find((e) => e.entryId === entryId);
+    if (!target) return;
+
+    setSlots((s) => ({ ...s, [key]: (s[key] ?? []).filter((e) => e.entryId !== entryId) }));
     setError(null);
 
     try {
-      const res = await fetch(`/api/weeks/${weekKey}/entries/${prevSlot.entryId}`, { method: "DELETE" });
+      const res = await fetch(`/api/weeks/${weekKey}/entries/${entryId}`, { method: "DELETE" });
       if (!res.ok) throw new Error("clear_failed");
     } catch {
-      setSlots((s) => ({ ...s, [key]: prevSlot }));
+      setSlots((s) => ({ ...s, [key]: [...(s[key] ?? []), target] }));
       setError("No se pudo quitar. Intenta de nuevo.");
     }
   }
@@ -201,10 +204,10 @@ export function CalendarBoard({
                     variant="row"
                     dayIndex={dayIndex}
                     mealType={meal}
-                    slot={slots[slotKey(dayIndex, meal)]}
-                    pending={pendingSlots.has(slotKey(dayIndex, meal))}
+                    entries={slots[slotKey(dayIndex, meal)] ?? []}
+                    pendingEntryIds={pendingEntryIds}
                     onTap={() => handleSlotTap(dayIndex, meal)}
-                    onClear={() => clear(dayIndex, meal)}
+                    onClear={(entryId) => clear(entryId, dayIndex, meal)}
                   />
                 ))}
               </div>
@@ -232,10 +235,10 @@ export function CalendarBoard({
                     variant="grid"
                     dayIndex={dayIndex}
                     mealType={meal}
-                    slot={slots[slotKey(dayIndex, meal)]}
-                    pending={pendingSlots.has(slotKey(dayIndex, meal))}
+                    entries={slots[slotKey(dayIndex, meal)] ?? []}
+                    pendingEntryIds={pendingEntryIds}
                     onTap={() => handleSlotTap(dayIndex, meal)}
-                    onClear={() => clear(dayIndex, meal)}
+                    onClear={(entryId) => clear(entryId, dayIndex, meal)}
                   />
                 ))}
               </Fragment>
