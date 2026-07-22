@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { RecipeActions } from "@/components/recipes/RecipeActions";
+import { asStringArray } from "@/lib/json";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,8 @@ export default async function RecipeDetailPage({
   if (!recipe) notFound();
 
   const folders = await prisma.folder.findMany({ orderBy: { order: "asc" } });
+  const ingredients = asStringArray(recipe.ingredients);
+  const steps = asStringArray(recipe.steps);
 
   return (
     <div className="mx-auto max-w-2xl px-4 pt-6">
@@ -48,11 +51,11 @@ export default async function RecipeDetailPage({
         )}
       </div>
 
-      {recipe.ingredients.length > 0 && (
+      {ingredients.length > 0 && (
         <section className="mt-6">
           <h2 className="mb-2 text-base font-semibold text-text">Ingredientes</h2>
           <ul className="flex flex-col gap-1.5">
-            {recipe.ingredients.map((ingredient, index) => (
+            {ingredients.map((ingredient, index) => (
               <li key={index} className="flex items-start gap-2 text-sm text-text">
                 <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
                 {ingredient}
@@ -62,11 +65,11 @@ export default async function RecipeDetailPage({
         </section>
       )}
 
-      {recipe.steps.length > 0 && (
+      {steps.length > 0 && (
         <section className="mt-6">
           <h2 className="mb-2 text-base font-semibold text-text">Pasos</h2>
           <ol className="flex flex-col gap-3">
-            {recipe.steps.map((step, index) => (
+            {steps.map((step, index) => (
               <li key={index} className="flex gap-3 text-sm text-text">
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface text-xs font-medium text-text-muted">
                   {index + 1}
@@ -78,7 +81,7 @@ export default async function RecipeDetailPage({
         </section>
       )}
 
-      {recipe.ingredients.length === 0 && recipe.steps.length === 0 && (
+      {ingredients.length === 0 && steps.length === 0 && (
         <p className="mt-6 text-sm text-text-muted">
           Esta receta todavía no tiene ingredientes ni pasos guardados.
         </p>

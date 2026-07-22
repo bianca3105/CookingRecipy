@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { isValidMondayKey, parseMondayKey } from "@/lib/week";
+import { isValidMondayKey, parseMondayKey, type MealType } from "@/lib/week";
 import { CalendarBoard } from "@/components/calendar/CalendarBoard";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +38,7 @@ export default async function CalendarWeekPage({
   const entries = (weekRow?.menuEntries ?? []).map((e) => ({
     id: e.id,
     dayIndex: e.dayIndex,
-    mealType: e.mealType,
+    mealType: e.mealType as MealType,
     recipe: e.recipe,
   }));
 

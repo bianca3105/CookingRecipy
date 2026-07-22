@@ -4,13 +4,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-}
-
-enum MealType {
-  BREAKFAST
-  LUNCH
-  DINNER
+  provider = "sqlite"
 }
 
 model Folder {
@@ -24,8 +18,8 @@ model Folder {
 model Recipe {
   id          String      @id @default(cuid())
   name        String
-  ingredients String[]
-  steps       String[]
+  ingredients Json
+  steps       Json
   servings    String?
   totalTime   String?
   sourceUrl   String?
@@ -41,7 +35,7 @@ model Recipe {
 
 model Week {
   id          String      @id @default(cuid())
-  startDate   DateTime    @unique @db.Date
+  startDate   DateTime    @unique
   menuEntries MenuEntry[]
 }
 
@@ -50,7 +44,7 @@ model MenuEntry {
   weekId   String
   week     Week     @relation(fields: [weekId], references: [id], onDelete: Cascade)
   dayIndex Int
-  mealType MealType
+  mealType String
   recipeId String
   recipe   Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
 
