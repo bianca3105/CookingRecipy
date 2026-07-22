@@ -1,0 +1,59 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+}
+
+model Folder {
+  id      String   @id @default(cuid())
+  key     String   @unique
+  name    String
+  order   Int      @default(0)
+  recipes Recipe[]
+}
+
+model Recipe {
+  id          String      @id @default(cuid())
+  name        String
+  ingredients String[]
+  steps       String[]
+  servings    String?
+  totalTime   String?
+  sourceUrl   String?
+  imageUrl    String?
+  folderId    String
+  folder      Folder      @relation(fields: [folderId], references: [id])
+  menuEntries MenuEntry[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([folderId])
+}
+
+model Week {
+  id          String      @id @default(cuid())
+  startDate   DateTime    @unique @db.Date
+  menuEntries MenuEntry[]
+}
+
+model MenuEntry {
+  id       String   @id @default(cuid())
+  weekId   String
+  week     Week     @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  dayIndex Int
+  mealType MealType
+  recipeId String
+  recipe   Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@unique([weekId, dayIndex, mealType])
+  @@index([recipeId])
+}
