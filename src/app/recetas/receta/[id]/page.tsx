@@ -41,15 +41,23 @@ export default async function RecipeDetailPage({
 
       <h1 className="mt-3 text-2xl font-semibold text-text">{recipe.name}</h1>
 
-      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-text-muted">
-        {recipe.servings && <span>{recipe.servings}</span>}
-        {recipe.totalTime && <span>{recipe.totalTime}</span>}
-        {recipe.sourceUrl && (
-          <a href={recipe.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-accent">
-            Ver receta original
-          </a>
-        )}
-      </div>
+      {(recipe.servings || recipe.totalTime) && (
+        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-text-muted">
+          {recipe.servings && <span>{recipe.servings}</span>}
+          {recipe.totalTime && <span>{recipe.totalTime}</span>}
+        </div>
+      )}
+
+      {recipe.sourceUrl && (
+        <a
+          href={recipe.sourceUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 flex h-11 w-full items-center justify-center gap-1.5 rounded-full border border-border bg-surface text-sm font-medium text-text transition active:scale-[0.98]"
+        >
+          Ver receta original ↗
+        </a>
+      )}
 
       {ingredients.length > 0 && (
         <section className="mt-6">

@@ -250,6 +250,17 @@ export function NewRecipeForm({
         />
       </label>
 
+      <label className="flex flex-col gap-1">
+        <span className="text-sm font-medium text-text">Link de origen (opcional)</span>
+        <input
+          value={sourceUrl}
+          onChange={(e) => setSourceUrl(e.target.value)}
+          placeholder="https://..."
+          inputMode="url"
+          className="rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text"
+        />
+      </label>
+
       <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium text-text">Porciones</span>
